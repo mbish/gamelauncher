@@ -3,6 +3,8 @@
 import System.FilePath
 import qualified Data.Aeson as J
 import Data.Text
+import qualified Data.Text.Lazy as LazyText
+import Text.Replace as Replace
 import qualified Data.List as List
 import Control.Applicative
 import Control.Monad
@@ -34,19 +36,25 @@ optionsParser = Options <$> configFileParser <*> gameFileParser <*> systemParser
 getJSON :: FilePath -> IO B.ByteString
 getJSON = B.readFile
 
+expandCommand :: FilePath -> Text -> Text
+expandCommand gamePath command = LazyText.toStrict $ Replace.replaceWithList [
+        Replace.Replace "{file.path}" (pack gamePath)
+    ] (LazyText.fromStrict command)
+
 findCommand :: FilePath -> Text -> [SystemData.System] -> Maybe Text
-findCommand game systemName config =
-  List.find matchingSystem config >>= (\system ->
-    case List.find matchingGame (SystemData.overrides system) of
-        Nothing -> return (SystemData.command system)
-        Just g -> return (GameOverrides.command g)
-  )
+findCommand gamePath systemName config =
+  do {
+    system <- List.find matchingSystem config
+  ; game <- List.find matchingGame (SystemData.overrides system)
+  ; command <- return (GameOverrides.command game)
+  ; return (expandCommand gamePath command)
+  }
   where
     matchingSystem :: SystemData.System -> Bool
     matchingSystem c = (SystemData.system c) == systemName
 
     matchingGame :: GameOverrides.GameOverride -> Bool
-    matchingGame g = (GameOverrides.name g) == pack (takeBaseName game)
+    matchingGame g = (GameOverrides.name g) == pack (takeBaseName gamePath)
 
 main :: IO ()
 main = do
