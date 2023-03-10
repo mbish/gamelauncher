@@ -4,24 +4,15 @@
 
 name: gamelauncher
 version: 1.0.0.2
-license: BSD3
 license-file: LICENSE
-copyright: (c) Simon Marlow
-author: Simon Marlow
-maintainer: Simon Marlow <marlowsd@gmail.com>
-bug-reports: mailto:marlowsd@gmail.com
+author: Mark Bishop
 stability: stable
-homepage: http://www.haskell.org/hello/
-synopsis: Hello World, an example package
 category: Console, Text
 cabal-version: >= 1.6
 build-type: Simple
 
 Description:
-  This is an implementation of the classic "Hello World" program in
-  Haskell, as an example of how to create a minimal Haskell
-  application using Cabal and Hackage.  Please submit any suggestions and
-  improvements.
+  This is a launcher which execute a command depending on what system and game are selected
 
 source-repository head
   type:     darcs
@@ -33,7 +24,7 @@ flag threaded
 executable gamelauncher
   hs-source-dirs: src
   main-is: gamelauncher.hs
-  build-depends: base >= 4.2 && < 5, aeson >= 2.1, text, bytestring, optparse-applicative, filepath, text-replace
+  build-depends: base >= 4.2 && < 5, aeson >= 2.1, text, bytestring, optparse-applicative, filepath, text-replace, process
 
   if flag(threaded)
      ghc-options: -threaded

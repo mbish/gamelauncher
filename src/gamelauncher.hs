@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 
+import qualified System.Process as Process
 import System.FilePath
 import qualified Data.Aeson as J
 import Data.Text
@@ -75,10 +76,10 @@ main = do
  -- our choice. In this case, just print it.
  case d of
   Left err -> putStrLn err
-  Right ps -> print $
+  Right ps ->
     case findCommand (gameFile opts) (system opts) ps of
-        Nothing -> Nothing
-        Just a -> Just a
+        Nothing -> return ()
+        Just a -> Process.callCommand (unpack a)
  where
     opts = info (optionsParser <**> helper)  ( fullDesc
      <> progDesc "Command launcher based on game and system"
