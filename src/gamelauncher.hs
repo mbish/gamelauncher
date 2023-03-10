@@ -39,6 +39,14 @@ getJSON = B.readFile
 expandCommand :: FilePath -> Text -> Text
 expandCommand gamePath command = LazyText.toStrict $ Replace.replaceWithList [
         Replace.Replace "{file.path}" (pack gamePath)
+        , Replace.Replace "{file.name}" (pack $ takeFileName gamePath)
+        , Replace.Replace "{file.basename}" (pack $ takeBaseName gamePath)
+        , Replace.Replace "{file.dir}" (pack $ takeDirectory gamePath)
+        , Replace.Replace "{file.uri}" (pack (
+            case isAbsolute gamePath of
+                True -> "file://" ++ gamePath
+                False -> "file:/" ++ gamePath
+        ))
     ] (LazyText.fromStrict command)
 
 findCommand :: FilePath -> Text -> [SystemData.System] -> Maybe Text
