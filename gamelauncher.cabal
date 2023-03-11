@@ -24,7 +24,7 @@ flag threaded
 executable gamelauncher
   hs-source-dirs: src
   main-is: gamelauncher.hs
-  build-depends: base >= 4.2 && < 5, aeson >= 2.1, text, bytestring, optparse-applicative, filepath, text-replace, process
+  build-depends: base >= 4.2 && < 5, aeson, text, bytestring, optparse-applicative, filepath, text-replace, process
 
   if flag(threaded)
      ghc-options: -threaded
