@@ -1,0 +1,12 @@
+[
+  {
+    "system": "n64",
+    "command": "echo \"this is the ps3 default\"",
+    "overrides": [
+      {
+        "name": "Super Smash Bros. (USA)",
+        "command": "echo \"smash bros override\" {file.dir}"
+      }
+    ]
+  }
+]
