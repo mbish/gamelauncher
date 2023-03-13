@@ -27,9 +27,12 @@
 
         devShell = pkgs.mkShell {
           buildInputs = with haskellPackages; [
-            haskell-language-server
+            # haskell-language-server
             ghcid
             cabal-install
+            fix-imports
+            ormolu
+            hlint
           ];
           inputsFrom = builtins.attrValues self.packages.${system};
         };
