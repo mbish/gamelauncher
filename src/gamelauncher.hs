@@ -5,14 +5,16 @@ import Control.Monad
 import qualified Data.Aeson as J
 import qualified Data.ByteString.Lazy as B
 import qualified Data.List as List
-import Data.Text
+import Data.Text hiding (elem, filter, head, map)
 import qualified Data.Text.Lazy as LazyText
 import GHC.Generics
 import qualified GameOverrides
 import Options.Applicative
 import qualified System as SystemData
+import System.Environment
 import System.FilePath
 import qualified System.Process as Process
+import Text.Regex (matchRegex, mkRegex, subRegex)
 import Text.Replace as Replace
 
 data Options = Options
@@ -38,32 +40,41 @@ optionsParser = Options <$> configFileParser <*> gameFileParser <*> systemParser
 getJSON :: FilePath -> IO B.ByteString
 getJSON = B.readFile
 
-expandCommand :: FilePath -> Text -> Text
-expandCommand gamePath command =
-  LazyText.toStrict $
-    Replace.replaceWithList
-      [ Replace.Replace "{file.path}" (pack gamePath),
-        Replace.Replace "{file.name}" (pack $ takeFileName gamePath),
-        Replace.Replace "{file.basename}" (pack $ takeBaseName gamePath),
-        Replace.Replace "{file.dir}" (pack $ takeDirectory gamePath),
-        Replace.Replace
-          "{file.uri}"
-          ( pack
-              ( if isAbsolute gamePath
-                  then "file://" ++ gamePath
-                  else "file:/" ++ gamePath
-              )
-          )
-      ]
-      (LazyText.fromStrict command)
+filterEnvs :: [(String, String)] -> [String] -> [(String, String)]
+filterEnvs environment selected = filter ((`elem` selected) . fst) environment
 
-findCommand :: FilePath -> Text -> [SystemData.System] -> Maybe Text
-findCommand gamePath systemName config =
+replaceEnvs :: String -> [(String, String)] -> String
+replaceEnvs input [] = input
+replaceEnvs input (firstEnv : rest) =
+  let next = replaceEnvs input rest
+   in subRegex (mkRegex "\\{env\\.(.*)}") next (snd firstEnv)
+
+expandCommand :: FilePath -> Text -> [(String, String)] -> Text
+expandCommand gamePath command environment =
+  let formatFileURL path = if isAbsolute path then "file://" ++ path else "file:/" ++ path
+      fileReplaced =
+        LazyText.toStrict $
+          Replace.replaceWithList
+            [ Replace.Replace "{file.path}" (pack gamePath),
+              Replace.Replace "{file.name}" (pack $ takeFileName gamePath),
+              Replace.Replace "{file.basename}" (pack $ takeBaseName gamePath),
+              Replace.Replace "{file.dir}" (pack $ takeDirectory gamePath),
+              Replace.Replace "{file.uri}" (pack $ formatFileURL gamePath)
+            ]
+            (LazyText.fromStrict command)
+      matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") (unpack fileReplaced)
+      envReplaced = case matchedEnvs of
+        Just a -> replaceEnvs (unpack fileReplaced) (filterEnvs environment a)
+        Nothing -> unpack fileReplaced
+   in pack envReplaced
+
+findCommand :: FilePath -> Text -> [SystemData.System] -> [(String, String)] -> Maybe Text
+findCommand gamePath systemName config environment =
   do
     system <- List.find matchingSystem config
     game <- List.find matchingGame (SystemData.overrides system)
     let command = GameOverrides.command game
-    return (expandCommand gamePath command)
+    return (expandCommand gamePath command environment)
   where
     matchingSystem :: SystemData.System -> Bool
     matchingSystem c = SystemData.system c == systemName
@@ -75,6 +86,7 @@ main :: IO ()
 main = do
   -- Get JSON data and decode it
   opts <- execParser opts
+  environment <- getEnvironment
   d <- J.eitherDecode <$> getJSON (configFile opts) :: IO (Either String [SystemData.System])
   -- If d is Left, the JSON was malformed.
   -- In that case, we report the error.
@@ -83,7 +95,7 @@ main = do
   case d of
     Left err -> putStrLn err
     Right ps ->
-      case findCommand (gameFile opts) (system opts) ps of
+      case findCommand (gameFile opts) (system opts) ps environment of
         Nothing -> return ()
         Just a -> Process.callCommand (unpack a)
   where
