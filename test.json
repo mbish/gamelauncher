@@ -5,7 +5,7 @@
     "overrides": [
       {
         "name": "Super Smash Bros. (USA)",
-        "command": "echo \"smash bros override\" {file.dir}"
+        "command": "echo \"smash bros override\" {env.TEST}"
       }
     ]
   }
