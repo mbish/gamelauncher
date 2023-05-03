@@ -53,7 +53,7 @@ expandCommand :: FilePath -> Text -> [(String, String)] -> Text
 expandCommand gamePath command environment =
   let formatFileURL path = if isAbsolute path then "file://" ++ path else "file:/" ++ path
       fileReplaced =
-        LazyText.toStrict $
+        unpack . LazyText.toStrict $
           Replace.replaceWithList
             [ Replace.Replace "{file.path}" (pack gamePath),
               Replace.Replace "{file.name}" (pack $ takeFileName gamePath),
@@ -62,10 +62,10 @@ expandCommand gamePath command environment =
               Replace.Replace "{file.uri}" (pack $ formatFileURL gamePath)
             ]
             (LazyText.fromStrict command)
-      matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") (unpack fileReplaced)
+      matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") fileReplaced
       envReplaced = case matchedEnvs of
-        Just a -> replaceEnvs (unpack fileReplaced) (filterEnvs environment a)
-        Nothing -> unpack fileReplaced
+        Just a -> replaceEnvs fileReplaced (filterEnvs environment a)
+        Nothing -> fileReplaced
    in pack envReplaced
 
 findCommand :: FilePath -> Text -> [SystemData.System] -> [(String, String)] -> Maybe Text
