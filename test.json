@@ -8,5 +8,11 @@
         "command": "echo \"smash bros override\" {env.TEST}"
       }
     ]
+  },
+  {
+    "system": "n64",
+    "emulator": "parallel",
+    "command": "echo \"this is the parallel default\"",
+    "overrides": []
   }
 ]
