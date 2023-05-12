@@ -78,6 +78,7 @@ expandCommand gamePath command environment =
    in pack envReplaced
 
 reduceUntilEmpty :: [(a -> Bool)] -> Data.List.NonEmpty.NonEmpty a -> a
+reduceUntilEmpty [] as = Data.List.NonEmpty.head as
 reduceUntilEmpty (p : ps) as = case Data.List.NonEmpty.nonEmpty $ Data.List.NonEmpty.filter p as of
   Nothing -> Data.List.NonEmpty.head as
   Just result -> reduceUntilEmpty ps result
