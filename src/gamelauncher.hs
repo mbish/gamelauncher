@@ -5,7 +5,8 @@ import Control.Monad
 import qualified Data.Aeson as J
 import qualified Data.ByteString.Lazy as B
 import qualified Data.List as List
-import Data.Text hiding (elem, filter, head, map)
+import qualified Data.List.NonEmpty
+import Data.Text hiding (elem, filter, head, map, null)
 import qualified Data.Text.Lazy as LazyText
 import GHC.Generics
 import qualified GameOverrides
@@ -20,7 +21,9 @@ import Text.Replace as Replace
 data Options = Options
   { configFile :: FilePath,
     gameFile :: FilePath,
-    system :: Text
+    system :: Text,
+    emulator :: Text,
+    profile :: Text
   }
   deriving (Show)
 
@@ -33,8 +36,14 @@ gameFileParser = strOption (long "gameFile" <> short 'g' <> help "path to game f
 systemParser :: Parser Text
 systemParser = strOption (long "system" <> short 's' <> help "name of system" <> metavar "SYSTEM")
 
+emulatorParser :: Parser Text
+emulatorParser = strOption (long "emulator" <> short 'e' <> help "name of emulator" <> metavar "EMULATOR" <> value "")
+
+profileParser :: Parser Text
+profileParser = strOption (long "profile" <> short 'e' <> help "name of profile" <> metavar "PROFILE" <> value "")
+
 optionsParser :: Parser Options
-optionsParser = Options <$> configFileParser <*> gameFileParser <*> systemParser
+optionsParser = Options <$> configFileParser <*> gameFileParser <*> systemParser <*> emulatorParser <*> profileParser
 
 -- Read the local copy of the JSON file.
 getJSON :: FilePath -> IO B.ByteString
@@ -68,16 +77,29 @@ expandCommand gamePath command environment =
         Nothing -> fileReplaced
    in pack envReplaced
 
-findCommand :: FilePath -> Text -> [SystemData.System] -> [(String, String)] -> Maybe Text
-findCommand gamePath systemName config environment =
+reduceUntilEmpty :: [(a -> Bool)] -> Data.List.NonEmpty.NonEmpty a -> a
+reduceUntilEmpty (p : ps) as = case Data.List.NonEmpty.nonEmpty $ Data.List.NonEmpty.filter p as of
+  Nothing -> Data.List.NonEmpty.head as
+  Just result -> reduceUntilEmpty ps result
+
+findCommand :: FilePath -> Text -> Text -> Text -> [SystemData.System] -> [(String, String)] -> Maybe Text
+findCommand gamePath systemName emulatorName profileName config environment =
   do
-    system <- List.find matchingSystem config
-    game <- List.find matchingGame (SystemData.overrides system)
-    let command = GameOverrides.command game
+    systems <- Data.List.NonEmpty.nonEmpty $ List.filter matchingSystem config
+    let selection = reduceUntilEmpty [matchingSystem, matchingEmulator, matchingProfile] systems
+    let game = List.find matchingGame (SystemData.overrides selection)
+    let command =
+          case game of
+            Just g -> GameOverrides.command g
+            Nothing -> SystemData.command selection
     return (expandCommand gamePath command environment)
   where
     matchingSystem :: SystemData.System -> Bool
     matchingSystem c = SystemData.system c == systemName
+    matchingEmulator :: SystemData.System -> Bool
+    matchingEmulator c = SystemData.emulator c == (Just emulatorName)
+    matchingProfile :: SystemData.System -> Bool
+    matchingProfile c = SystemData.profile c == (Just profileName)
 
     matchingGame :: GameOverrides.GameOverride -> Bool
     matchingGame g = GameOverrides.name g == pack (takeBaseName gamePath)
@@ -95,7 +117,7 @@ main = do
   case d of
     Left err -> putStrLn err
     Right ps ->
-      case findCommand (gameFile opts) (system opts) ps environment of
+      case findCommand (gameFile opts) (system opts) (emulator opts) (profile opts) ps environment of
         Nothing -> return ()
         Just a -> Process.callCommand (unpack a)
   where
