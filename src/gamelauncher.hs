@@ -58,17 +58,20 @@ replaceEnvs input (firstEnv : rest) =
   let next = replaceEnvs input rest
    in subRegex (mkRegex "\\{env\\.(.*)}") next (snd firstEnv)
 
+wrapString :: Char -> String -> String
+wrapString wrapper toWrap = [wrapper] ++ toWrap ++ [wrapper]
+
 expandCommand :: FilePath -> Text -> [(String, String)] -> Text
 expandCommand gamePath command environment =
   let formatFileURL path = if isAbsolute path then "file://" ++ path else "file:/" ++ path
       fileReplaced =
         unpack . LazyText.toStrict $
           Replace.replaceWithList
-            [ Replace.Replace "{file.path}" (pack gamePath),
-              Replace.Replace "{file.name}" (pack $ takeFileName gamePath),
-              Replace.Replace "{file.basename}" (pack $ takeBaseName gamePath),
-              Replace.Replace "{file.dir}" (pack $ takeDirectory gamePath),
-              Replace.Replace "{file.uri}" (pack $ formatFileURL gamePath)
+            [ Replace.Replace "{file.path}" (pack (wrapString '"' gamePath)),
+              Replace.Replace "{file.name}" (pack $ (wrapString '"' $ takeFileName gamePath)),
+              Replace.Replace "{file.basename}" (pack $ (wrapString '"' $ takeBaseName gamePath)),
+              Replace.Replace "{file.dir}" (pack $ (wrapString '"' $ takeDirectory gamePath)),
+              Replace.Replace "{file.uri}" (pack $ (wrapString '"' $ formatFileURL gamePath))
             ]
             (LazyText.fromStrict command)
       matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") fileReplaced
