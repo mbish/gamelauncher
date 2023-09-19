@@ -1,0 +1,16 @@
+cradle:
+  multi:
+    # - path: "ignore/"
+    #   config: {cradle: {none: }}
+
+    - path: "src"
+      config: {cradle: {cabal: {component: "lib:gamelauncher"}}}
+
+    - path: "app"
+      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-exe"}}}
+
+    - path: "test"
+      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-test"}}}
+
+    - path: "bench"
+      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-bench"}}}
