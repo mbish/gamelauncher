@@ -4,13 +4,15 @@ cradle:
     #   config: {cradle: {none: }}
 
     - path: "src"
-      config: {cradle: {cabal: {component: "lib:gamelauncher"}}}
+      config: { cradle: { cabal: { component: "lib:gamelauncher" } } }
 
     - path: "app"
-      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-exe"}}}
+      config: { cradle: { cabal: { component: "gamelauncher:gamelauncher" } } }
 
     - path: "test"
-      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-test"}}}
+      config:
+        { cradle: { cabal: { component: "gamelauncher:gamelauncher-test" } } }
 
     - path: "bench"
-      config: {cradle: {cabal: {component: "gamelauncher:gamelauncher-bench"}}}
+      config:
+        { cradle: { cabal: { component: "gamelauncher:gamelauncher-bench" } } }
