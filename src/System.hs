@@ -24,7 +24,9 @@ data System = System
     emulator :: Maybe Text,
     profile :: Maybe Text,
     command :: Text,
-    overrides :: [GameOverrides.GameOverride]
+    overrides :: [GameOverrides.GameOverride],
+    precommands :: Maybe [Text],
+    postcommands :: Maybe [Text]
   }
   deriving (Show, Generic)
 
