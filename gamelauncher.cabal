@@ -26,7 +26,6 @@ common common-options
     , bytestring
     , aeson
     , libiserv
-    , text-replace
     , regex-compat
     , process
     , filepath

@@ -17,7 +17,6 @@ import System.Environment
 import System.FilePath
 import qualified System.Process as Process
 import Text.Regex (matchRegex, mkRegex, subRegex)
-import Text.Replace as Replace
 
 data Options = Options
   { configFile :: FilePath,
@@ -60,21 +59,25 @@ replaceEnvs input (firstEnv : rest) =
    in subRegex (mkRegex "\\{env\\.(.*)}") next (snd firstEnv)
 
 wrapString :: Char -> String -> String
-wrapString wrapper toWrap = [wrapper] ++ toWrap ++ [wrapper]
+wrapString wrapper toWrap = [wrapper] <> toWrap <> [wrapper]
+
+replaceNext :: [(String, String)] -> String -> String
+replaceNext [] s = s
+replaceNext (x:xs) s = replaceNext xs replaced
+  where
+    encoded = snd x
+    replaced = unpack $ replace (pack $ fst x) (pack encoded) (pack s)
 
 expandCommand :: FilePath -> [(String, String)] -> Text -> Text
-expandCommand gamePath environment command =
-  let formatFileURL path = if isAbsolute path then "file://" ++ path else "file:/" ++ path
-      fileReplaced =
-        unpack . LazyText.toStrict $
-          Replace.replaceWithList
-            [ Replace.Replace "{file.path}" (pack (wrapString '"' gamePath)),
-              Replace.Replace "{file.name}" (pack $ (wrapString '"' $ takeFileName gamePath)),
-              Replace.Replace "{file.basename}" (pack $ (wrapString '"' $ takeBaseName gamePath)),
-              Replace.Replace "{file.dir}" (pack $ (wrapString '"' $ takeDirectory gamePath)),
-              Replace.Replace "{file.uri}" (pack $ (wrapString '"' $ formatFileURL gamePath))
-            ]
-            (LazyText.fromStrict command)
+expandCommand gamePath environment commandStr =
+  let replaces = [ ("{file.path}", wrapString '"' gamePath),
+                   ("{file.name}", wrapString '"' $ takeFileName gamePath),
+                   ("{file.basename}", wrapString '"' $ takeBaseName gamePath),
+                   ("{file.dir}", wrapString '"' $ takeDirectory gamePath),
+                   ("{file.uri}", wrapString '"' $ formatFileURL gamePath)
+                ]
+      formatFileURL path = if isAbsolute path then "file://" <> path else "file:/" <> path
+      fileReplaced = replaceNext replaces (unpack commandStr)
       matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") fileReplaced
       envReplaced = case matchedEnvs of
         Just a -> replaceEnvs fileReplaced (filterEnvs environment a)
