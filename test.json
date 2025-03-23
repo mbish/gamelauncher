@@ -1,0 +1,20 @@
+[
+  {
+    "system": "n64",
+    "command": "echo default running command {file.path}",
+    "precommands": ["echo before"],
+    "postcommands": ["echo after"],
+    "overrides": [
+      {
+        "name": "Super Smash Bros. (USA)",
+        "command": "echo \"smash bros override\" {file.path}"
+      }
+    ]
+  },
+  {
+    "system": "n64",
+    "emulator": "parallel",
+    "command": "echo \"this is the parallel default\"",
+    "overrides": []
+  }
+]
