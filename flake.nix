@@ -1,7 +1,7 @@
 {
   description = "gamelauncher";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = inputs: let
