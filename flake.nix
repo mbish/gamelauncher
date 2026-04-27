@@ -37,6 +37,9 @@
       };
       defaultPackage = pkgs.gamelauncher;
       packages.default = pkgs.gamelauncher;
+      overlays.default = final: prev: {
+        inherit (pkgs) gamelauncher;
+      };
     };
   in
     {inherit overlay;} // inputs.flake-utils.lib.eachDefaultSystem perSystem;
