@@ -122,14 +122,14 @@ main = do
   -- If d is Left, the JSON was malformed.
   -- In that case, we report the error.
   -- Otherwise, we perform the operation of
-  -- our choice. In this case, just print it.
+  -- our choice. 
   case d of
     Left err -> putStrLn err
     Right ps ->
       case findCommands (gameFile opts) (system opts) (emulator opts) (profile opts) ps environment of
         Nothing -> return ()
         Just a -> do
-          mapM_ (Process.callCommand . unpack) a
+          mapM_ (run . unpack) a
   where
     opts =
       info
@@ -138,3 +138,5 @@ main = do
             <> progDesc "Command launcher based on game and system"
             <> header "GameLauncher"
         )
+    run a = Process.withCreateProcess (Process.shell a) $ \_ _ _ ph -> do
+        Process.waitForProcess ph
