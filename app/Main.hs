@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Control.Applicative
+import Control.Concurrent.Async (race)
+import Control.Concurrent.MVar
 import Control.Monad
 import qualified Data.Aeson as J
 import qualified Data.ByteString.Lazy as B
@@ -15,6 +17,8 @@ import Options.Applicative
 import qualified System as SystemData
 import System.Environment
 import System.FilePath
+import qualified System.Posix as Process.Signals
+import System.Posix.Signals
 import qualified System.Process as Process
 import Text.Regex (matchRegex, mkRegex, subRegex)
 
@@ -63,19 +67,20 @@ wrapString wrapper toWrap = [wrapper] <> toWrap <> [wrapper]
 
 replaceNext :: [(String, String)] -> String -> String
 replaceNext [] s = s
-replaceNext (x:xs) s = replaceNext xs replaced
+replaceNext (x : xs) s = replaceNext xs replaced
   where
     encoded = snd x
     replaced = unpack $ replace (pack $ fst x) (pack encoded) (pack s)
 
 expandCommand :: FilePath -> [(String, String)] -> Text -> Text
 expandCommand gamePath environment commandStr =
-  let replaces = [ ("{file.path}", wrapString '"' gamePath),
-                   ("{file.name}", wrapString '"' $ takeFileName gamePath),
-                   ("{file.basename}", wrapString '"' $ takeBaseName gamePath),
-                   ("{file.dir}", wrapString '"' $ takeDirectory gamePath),
-                   ("{file.uri}", wrapString '"' $ formatFileURL gamePath)
-                ]
+  let replaces =
+        [ ("{file.path}", wrapString '"' gamePath),
+          ("{file.name}", wrapString '"' $ takeFileName gamePath),
+          ("{file.basename}", wrapString '"' $ takeBaseName gamePath),
+          ("{file.dir}", wrapString '"' $ takeDirectory gamePath),
+          ("{file.uri}", wrapString '"' $ formatFileURL gamePath)
+        ]
       formatFileURL path = if isAbsolute path then "file://" <> path else "file:/" <> path
       fileReplaced = replaceNext replaces (unpack commandStr)
       matchedEnvs = matchRegex (mkRegex "\\{env\\.(.*)}") fileReplaced
@@ -113,23 +118,40 @@ findCommands gamePath systemName emulatorName profileName config environment =
     matchingGame :: GameOverrides.GameOverride -> Bool
     matchingGame g = GameOverrides.name g == pack (takeBaseName gamePath)
 
+run :: MVar () -> String -> IO ()
+run signal a = do
+  _ <- tryTakeMVar signal
+  Process.withCreateProcess (Process.shell a) $ \_ _ _ ph -> do
+    result <- race (takeMVar signal) (Process.waitForProcess ph)
+    case result of
+      Left () -> do
+        Process.terminateProcess ph
+        _ <- Process.waitForProcess ph
+        pure ()
+      Right _ -> pure ()
+  where
+    signals = Prelude.foldl (flip addSignal) emptySignalSet [sigQUIT, sigCHLD]
+
 main :: IO ()
 main = do
   -- Get JSON data and decode it
   opts <- execParser opts
   environment <- getEnvironment
   d <- J.eitherDecode <$> getJSON (configFile opts) :: IO (Either String [SystemData.System])
+  hupSignal <- newEmptyMVar
+  _ <- installHandler sigHUP (Catch (tryPutMVar hupSignal () >> pure ())) Nothing
+  _ <- installHandler sigQUIT (Catch (tryPutMVar hupSignal () >> pure ())) Nothing
   -- If d is Left, the JSON was malformed.
   -- In that case, we report the error.
   -- Otherwise, we perform the operation of
-  -- our choice. 
+  -- our choice.
   case d of
     Left err -> putStrLn err
     Right ps ->
       case findCommands (gameFile opts) (system opts) (emulator opts) (profile opts) ps environment of
         Nothing -> return ()
         Just a -> do
-          mapM_ (run . unpack) a
+          mapM_ ((run hupSignal) . unpack) a
   where
     opts =
       info
@@ -138,5 +160,3 @@ main = do
             <> progDesc "Command launcher based on game and system"
             <> header "GameLauncher"
         )
-    run a = Process.withCreateProcess (Process.shell a) $ \_ _ _ ph -> do
-        Process.waitForProcess ph
