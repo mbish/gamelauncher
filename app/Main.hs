@@ -124,10 +124,12 @@ findCommands gamePath systemName emulatorName profileName config environment =
     matchingGame g = GameOverrides.name g == pack (takeBaseName gamePath)
 
 run :: MVar () -> String -> IO ()
-run signal a = do
-  _ <- tryTakeMVar signal
+run hup a = do
+  _ <- tryTakeMVar hup
   Process.withCreateProcess process $ \_ _ _ ph -> do
-    result <- race (takeMVar signal) (Process.waitForProcess ph)
+    _ <- installHandler sigSTOP (Catch (pauseProcess ph)) Nothing
+    _ <- installHandler sigCONT (Catch (resumeProcess ph)) Nothing
+    result <- race (takeMVar hup) (Process.waitForProcess ph)
     case result of
       Left () -> do
         maybePid <- Process.getPid ph
@@ -141,6 +143,20 @@ run signal a = do
       Right _ -> pure ()
   where
     process = (Process.shell a) { Process.create_group = True }
+    pauseProcess p = do
+      maybePid <- Process.getPid p
+      case maybePid of
+        Nothing -> pure ()
+        Just pid -> do
+          pgid <- getProcessGroupIDOf pid
+          signalProcessGroup sigSTOP pgid
+    resumeProcess p = do
+      maybePid <- Process.getPid p
+      case maybePid of
+        Nothing -> pure ()
+        Just pid -> do
+          pgid <- getProcessGroupIDOf pid
+          signalProcessGroup sigCONT pgid
 
 main :: IO ()
 main = do
