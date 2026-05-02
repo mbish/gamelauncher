@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import System.Posix.Process (getProcessGroupIDOf)
 import Control.Applicative
 import Control.Concurrent.Async (race)
 import Control.Concurrent.MVar
@@ -21,6 +22,7 @@ import qualified System.Posix as Process.Signals
 import System.Posix.Signals
 import qualified System.Process as Process
 import Text.Regex (matchRegex, mkRegex, subRegex)
+import qualified System.Posix as Process
 
 data Options = Options
   { configFile :: FilePath,
@@ -30,6 +32,9 @@ data Options = Options
     profile :: Text
   }
   deriving (Show)
+
+versionOption :: Parser (a -> a)
+versionOption = infoOption "1.0.0" (long "version" <> help "Show version")
 
 configFileParser :: Parser FilePath
 configFileParser = strOption (long "inputFile" <> short 'i' <> help "Input file " <> metavar "FILE")
@@ -121,16 +126,21 @@ findCommands gamePath systemName emulatorName profileName config environment =
 run :: MVar () -> String -> IO ()
 run signal a = do
   _ <- tryTakeMVar signal
-  Process.withCreateProcess (Process.shell a) $ \_ _ _ ph -> do
+  Process.withCreateProcess process $ \_ _ _ ph -> do
     result <- race (takeMVar signal) (Process.waitForProcess ph)
     case result of
       Left () -> do
-        Process.terminateProcess ph
+        maybePid <- Process.getPid ph
+        case maybePid of
+          Nothing -> Process.terminateProcess ph
+          Just pid -> do
+            pgid <- getProcessGroupIDOf pid
+            signalProcessGroup sigQUIT pgid
         _ <- Process.waitForProcess ph
         pure ()
       Right _ -> pure ()
   where
-    signals = Prelude.foldl (flip addSignal) emptySignalSet [sigQUIT, sigCHLD]
+    process = (Process.shell a) { Process.create_group = True }
 
 main :: IO ()
 main = do
@@ -155,7 +165,7 @@ main = do
   where
     opts =
       info
-        (optionsParser <**> helper)
+        (helper <*> versionOption <*> optionsParser)
         ( fullDesc
             <> progDesc "Command launcher based on game and system"
             <> header "GameLauncher"
