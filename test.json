@@ -7,7 +7,7 @@
     "overrides": [
       {
         "name": "Super Smash Bros. (USA)",
-        "command": "sleep 30 && echo \"smash bros override\" {file.path}"
+        "command": "sleep 10 && echo \"smash bros override\" {file.path}"
       }
     ]
   },

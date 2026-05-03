@@ -127,6 +127,8 @@ run :: MVar () -> String -> IO ()
 run hup a = do
   _ <- tryTakeMVar hup
   Process.withCreateProcess process $ \_ _ _ ph -> do
+    _ <- installHandler sigUSR1 (Catch (pauseProcess ph)) Nothing
+    _ <- installHandler sigUSR2 (Catch (resumeProcess ph)) Nothing
     result <- race (takeMVar hup) (Process.waitForProcess ph)
     case result of
       Left () -> do
