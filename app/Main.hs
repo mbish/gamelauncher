@@ -138,6 +138,7 @@ run hup a = do
           Just pid -> do
             pgid <- getProcessGroupIDOf pid
             signalProcessGroup sigCONT pgid
+            signalProcessGroup sigQUIT pgid
             signalProcessGroup sigTERM pgid
         _ <- Process.waitForProcess ph
         pure ()
